@@ -1,7 +1,21 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
 void main() {
   runApp(MyApp());
+}
+
+class News {
+  final String title;
+  final String description;
+  final String author;
+  final String urlToImage;
+  final String publishedAt;
+
+  News(this.title, this.description, this.author, this.urlToImage,
+      this.publishedAt);
 }
 
 class MyApp extends StatelessWidget {
@@ -9,109 +23,191 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // Try running your application with "flutter run". You'll see the
-        // application has a blue toolbar. Then, without quitting the app, try
-        // changing the primarySwatch below to Colors.green and then invoke
-        // "hot reload" (press "r" in the console where you ran "flutter run",
-        // or simply save your changes to "hot reload" in a Flutter IDE).
-        // Notice that the counter didn't reset back to zero; the application
-        // is not restarted.
-        primarySwatch: Colors.blue,
-        // This makes the visual density adapt to the platform that you run
-        // the app on. For desktop platforms, the controls will be smaller and
-        // closer together (more dense) than on mobile platforms.
-        visualDensity: VisualDensity.adaptivePlatformDensity,
-      ),
-      home: MyHomePage(title: 'Flutter Demo Home Page'),
+      home: NewsHome(),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  MyHomePage({Key key, this.title}) : super(key: key);
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
-
+class NewsHome extends StatefulWidget {
   @override
-  _MyHomePageState createState() => _MyHomePageState();
+  State<StatefulWidget> createState() {
+    return _NewsState();
+  }
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+class _NewsState extends State<NewsHome> {
 
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
+  Future<List<News>> getNews() async {
+    var data = await http.get(
+        'http://newsapi.org/v2/top-headlines?country=us&category=business&apiKey=e5a7abe04cb44e41843fc49f810f6591');
+
+    var jsonData = json.decode(data.body);
+
+    var newsData = jsonData['articles'];
+
+    List<News> news = [];
+
+    for (var data in newsData) {
+      News newsItem = News(data['title'], data['description'], data['author'],
+          data['urlToImage'], data['publishedAt']);
+      news.add(newsItem);
+    }
+    return news;
   }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
     return Scaffold(
       appBar: AppBar(
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
+        title: Text('Headline News'),
       ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Invoke "debug painting" (press "p" in the console, choose the
-          // "Toggle Debug Paint" action from the Flutter Inspector in Android
-          // Studio, or the "Toggle Debug Paint" command in Visual Studio Code)
-          // to see the wireframe for each widget.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            Text(
-              'You have pushed the button this many times:',
-            ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headline4,
-            ),
-          ],
+      body: Container(
+        child: FutureBuilder(
+          future: getNews(),
+          builder: (BuildContext context, AsyncSnapshot snapshot) {
+            if (snapshot.data == null) {
+              return Container(
+                child: Center(
+                  child: CircularProgressIndicator(),
+                ),
+              );
+            } else {
+              return ListView.builder(
+                itemCount: snapshot.data.length,
+                itemBuilder: (BuildContext context, int index) {
+                  return InkWell(
+                    onTap: () {
+                      News news = new News(
+                        snapshot.data[index].title, 
+                        snapshot.data[index].description,
+                         snapshot.data[index].author, 
+                         snapshot.data[index].urlToImage, 
+                         snapshot.data[index].publishedAt);
+                      Navigator.push(
+                        context, 
+                        MaterialPageRoute(builder: (context) =>
+                          new Details(news: news)
+                        )
+                      );
+                    },
+                    child: Card(
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 120.0,
+                            height: 120.0,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.only(
+                                  topLeft: const Radius.circular(8.0),
+                                  bottomLeft: const Radius.circular(8.0)),
+                              child: (snapshot.data[index].urlToImage == null)
+                                  ? Image.network(
+                                      'http://www.nftitalia.com/wp-content/uploads/2017/07/news-1-1600x429.jpg')
+                                  : Image.network(
+                                      snapshot.data[index].urlToImage,
+                                      width: 100,
+                                      fit: BoxFit.fill,
+                                    ),
+                            ),
+                          ),
+                          Expanded(
+                            child: ListTile(
+                              title: Text(snapshot.data[index].title),
+                              subtitle: Text(snapshot.data[index].author == null
+                                  ? 'Unknown'
+                                  : snapshot.data[index].author),
+                            ),
+                          )
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              );
+            }
+          },
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
     );
   }
+}
+
+class Details extends StatelessWidget {
+  final News news;
+
+  Details({this.news});
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+        body: Center( 
+          child: Container(
+            child: Column(
+              children: [
+                Stack(
+                  children: [
+                    Container(
+                      height: 400.0,
+                      child: Image.network(
+                        this.news.urlToImage,
+                        fit: BoxFit.fill,
+                      ),                
+                    ),
+                    AppBar(
+                      backgroundColor: Colors.transparent,
+                      leading: InkWell(
+                        onTap: () => Navigator.pop(context),
+                        child: Icon(Icons.arrow_back_ios),
+                      ),
+                      elevation: 0,
+                    )
+                  ],
+                ),
+                Padding(
+                  padding: EdgeInsets.all(8.0),
+                  child: Column(
+                    children: [
+                      SizedBox(height: 10.0,),
+                      Text(this.news.title,
+                      style: TextStyle(
+                        color: Colors.black87,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.2,
+                        wordSpacing: 0.6
+                      ),),
+                      SizedBox(height: 20.0,),
+                      Text(
+                        this.news.description,
+                        style: TextStyle(
+                          color: Colors.black45,
+                          fontSize: 16.0,
+                          letterSpacing: 0.2,
+                          wordSpacing: 0.3
+                        ),
+                      ),
+                      SizedBox(
+                        height: 20.0,
+                      ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            this.news.author == null 
+                            ? 'Unknown' : this.news. author,
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                          Text(this.news.publishedAt,
+                          style: TextStyle(color: Colors.grey),)
+                        ],
+                      )
+                    ],
+                  ),                
+                )
+              ],
+            ),
+          ),
+        ),
+    )
+  }
+
 }
